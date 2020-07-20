@@ -37,6 +37,7 @@ public abstract class AbstractParser {
      */
     protected HtmlPage getHtmlPage(String link) throws IOException {
         WebClient client = new WebClient();
+        client.getOptions().setThrowExceptionOnFailingStatusCode(false);
         client.getOptions().setCssEnabled(false);
         client.getOptions().setJavaScriptEnabled(false);
         return client.getPage(link);

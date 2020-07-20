@@ -62,7 +62,7 @@ public class ConfigManager {
      * @return
      */
     public boolean isPriceMoreThanMax(double actualPrice, double maxPrice) {
-        double percentage = ((maxPrice - actualPrice)/actualPrice) * 100;
+        double percentage = ((actualPrice/maxPrice) - 1)* 100;
         if (percentage > Double.parseDouble(prop.getProperty(KEY_MAX_PERCENTAGE))) {
             return true;
         }

@@ -4,6 +4,7 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import entities.FileEntity;
 import entities.Steps;
 import entities.Ticket;
+import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.select.Elements;
@@ -50,6 +51,11 @@ public class SearcherParser extends AbstractParser {
      */
     public Map<String, Double> getPositionWithMinPrice(Map<String, Double> positions) {
         int size = positions.size();
+        if (size == 0) {
+            Map<String, Double> mockResult = new HashMap<>();
+            mockResult.put(StringUtils.EMPTY, 0.0);
+            return mockResult;
+        }
         Set<String> keys = positions.keySet();
         String minKey = null;
         //set minPrice max value for finding min value
@@ -73,6 +79,11 @@ public class SearcherParser extends AbstractParser {
      */
     public Map<String, Double> getPositionWithMaxPrice(Map<String, Double> positions) {
         int size = positions.size();
+        if (size == 0) {
+            Map<String, Double> mockResult = new HashMap<>();
+            mockResult.put(StringUtils.EMPTY, 9999999.0);
+            return mockResult;
+        }
         Set<String> keys = positions.keySet();
         String maxKey = null;
         Double maxPrice = 0.0;

@@ -21,6 +21,9 @@ public class UtilClass {
      * @return
      */
     public static double calcAvgPrice(Collection<Double> prices) {
+        if (prices.size() == 0) {
+            return 0.0;
+        }
         OptionalDouble average = prices.stream().mapToDouble(e -> e).average();
         if (average.isPresent()) {
             return average.getAsDouble();
