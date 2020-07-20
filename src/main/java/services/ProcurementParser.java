@@ -1,13 +1,20 @@
-package entities;
+package services;
 
-import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.html.HtmlAnchor;
 import com.gargoylesoftware.htmlunit.html.HtmlElement;
 import com.gargoylesoftware.htmlunit.html.HtmlPage;
+import entities.Steps;
+import entities.Ticket;
+import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -15,7 +22,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class ProcurementParser {
+import static utils.UtilClass.getStringOfNumbers;
+import static utils.UtilClass.separatePositions;
+
+@Component
+public class ProcurementParser extends AbstractParser {
+
+    private static final Logger log = LoggerFactory.getLogger(ProcurementParser.class);
 
 //  проверку текста заявки на валидность(только закупки)
     private static final String MAIN_PAGE_LINK =
@@ -33,12 +46,19 @@ public class ProcurementParser {
 
     private static final String positionItemTagName = "tableBlock__row";
 
-    public static List<Ticket> parseTickets() {
+    @Autowired
+    private ConfigManager configManager;
+
+    @Autowired
+    private ApplicationEventPublisher publisher;
+
+    public List<Ticket> parseTickets() {
         List<Ticket> result = new ArrayList<>();
-        int floor = new ConfigManager().getLimitFloor();
+        int floor = configManager.getLimitFloor();
         try {
-            for (int pageNumber = 1; pageNumber <= 3; pageNumber++) {
+            for (int pageNumber = 1; pageNumber <= 1; pageNumber++) {
                 HtmlPage page = getHtmlPage(MAIN_PAGE_LINK + START_PAGE_LINK_FIRST + pageNumber + START_PAGE_LINK_SECOND);
+                Thread.sleep(1000);
                 int i = 0;
                 List<HtmlElement> items = (List<HtmlElement>) page.getByXPath("//div[@class='" + ITEM_TAG_NAME + "']");
                 for (HtmlElement item : items) {
@@ -59,17 +79,21 @@ public class ProcurementParser {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
+            log.info(String.format("The first amount is: %s", result.size()));
+            EventManager eventManager = new EventManager(this, Steps.GET_ACTUAL_PRICES.toString());
+            eventManager.setCollectedTickets(separatePositions(result));
+            publisher.publishEvent(eventManager);
             return result;
         }
     }
 
-    private static String getId(HtmlElement item, int i) {
+    private String getId(HtmlElement item, int i) {
         HtmlElement idTag = ((List<HtmlElement>) item.getByXPath("//div[@class='" + ID_TAG_NAME + "']")).get(i);
         HtmlAnchor itemAnchor = ((HtmlAnchor) idTag.getFirstByXPath(".//a"));
         return itemAnchor.asText().replace("№", "").trim();
     }
 
-    private static String getLinkOfTicket(HtmlElement item, int i) {
+    private String getLinkOfTicket(HtmlElement item, int i) {
         HtmlElement idTag = ((List<HtmlElement>) item.getByXPath("//div[@class='" + ID_TAG_NAME + "']")).get(i);
         HtmlAnchor itemAnchor = ((HtmlAnchor) idTag.getFirstByXPath(".//a"));
         String link = itemAnchor.getHrefAttribute();
@@ -79,19 +103,19 @@ public class ProcurementParser {
         return MAIN_PAGE_LINK + "/" + link;
     }
 
-    private static double getPrice(HtmlElement item, int i) {
+    public double getPrice(HtmlElement item, int i) {
         HtmlElement idTag = ((List<HtmlElement>) item.getByXPath("//div[@class='" + PRICE_TAG_NAME + "']")).get(i);
         String priceString = idTag.asText().replace(" ", "")
                 .replace("₽", "").replace(",", ".").trim();
         return Double.parseDouble(priceString);
     }
 
-    private static String getText(HtmlElement item, int i) {
+    private String getText(HtmlElement item, int i) {
         HtmlElement idTag = ((List<HtmlElement>) item.getByXPath("//div[@class='" + TEXT_TAG_NAME + "']")).get(i);
         return idTag.asText();
     }
 
-    public static Ticket getTicketInfo(HtmlElement item, Double price, int i) throws IOException {
+    public Ticket getTicketInfo(HtmlElement item, Double price, int i) throws IOException {
         String link = getLinkOfTicket(item, i);
         String id = getId(item, i);
         Ticket ticket = new Ticket(id);
@@ -115,9 +139,8 @@ public class ProcurementParser {
         return ticket;
     }
 
-    //https://www.tutorialspoint.com/jsoup/jsoup_use_dom.htm
-
-    public static Map<String, Double> getPositions(HtmlPage page) {
+    @Override
+    public Map<String, Double> getPositions(HtmlPage page) {
         try {
             Map<Integer, Double> prices = new HashMap<>();
             Map<Integer, String> items = new HashMap<>();
@@ -148,10 +171,12 @@ public class ProcurementParser {
                     String priceString = el.getElementsByTag("td")
                             .get(size - 2).text().replace(",", ".").trim()
                             .replaceAll("\\s", "");
+                    if (getStringOfNumbers(priceString) == null) {
+                        continue;
+                    }
                     prices.put(i, Double.valueOf(priceString));
                     ++i;
                     System.out.println(priceString);
-                    break;
                 }
             }
             return mixMaps(prices, items);
@@ -161,9 +186,12 @@ public class ProcurementParser {
         }
     }
 
-    public static double getFinishTotalSum(String link) throws IOException {
-        HtmlPage page = getHtmlPage(link);//tableBlock__body
+    public double getFinishTotalSum(String link) throws IOException {
+        HtmlPage page = getHtmlPage(link);
         List<HtmlElement> items = (List<HtmlElement>) page.getByXPath("//tbody[@class='" + "tableBlock__body" + "']");
+        if (items.isEmpty()) {
+            return 0.0;
+        }
         List<HtmlElement> elements = items.get(0).getHtmlElementsByTagName("td");
         if (elements.size() < 3) {
             return 0.0;
@@ -171,22 +199,25 @@ public class ProcurementParser {
         HtmlElement element = items.get(0).getHtmlElementsByTagName("td").get(3);
         System.out.println(items.get(0).asText().trim());
         System.out.println(element.asText().trim());
-        String priceString = element.asText().trim().replace(",", ".")
-                .replaceAll("\\s", "");
-        if (priceString.isEmpty()) {
+        String priceString = getStringOfNumbers(element.asText().trim().replace(",", ".")
+                .replaceAll("\\s", ""));
+        if (priceString == null) {
             return 0.0;
         }
         return Double.parseDouble(priceString);
     }
 
-    public static String getAktdat(String link) throws IOException {//table__cell table__cell-body
+    public String getAktdat(String link) throws IOException {//table__cell table__cell-body
         HtmlPage page = getHtmlPage(link);//tableBlock__body
         Document document = Jsoup.parse(page.asXml());
         Elements els = document.select("span:contains(Дата и время формирования результатов определения поставщика)");
+        if (els.isEmpty()) {
+            return StringUtils.EMPTY;
+        }
         return els.get(0).firstElementSibling().nextElementSibling().text().trim();
     }
 
-    private static Map<String, Double> mixMaps(Map<Integer, Double> prices, Map<Integer, String> items) {
+    private Map<String, Double> mixMaps(Map<Integer, Double> prices, Map<Integer, String> items) {
         Map<String, Double> positions = new HashMap<>();
         for(int i = 0; i < prices.size(); i++) {
             positions.put(items.get(i), prices.get(i));
@@ -194,40 +225,21 @@ public class ProcurementParser {
         return positions;
     }
 
-    private static void checkPositions(Map<String, Double> positions, String key, Double newValue) {
+    private void checkPositions(Map<String, Double> positions, String key, Double newValue) {
         if ((!positions.containsKey(key)) ||
                 (positions.containsKey(key) && positions.get(key) < newValue)) {
             positions.put(key, newValue);
         }
     }
 
-    public static String getCustomer(HtmlPage page) {
+    public String getCustomer(HtmlPage page) {
         List<HtmlElement> items = (List<HtmlElement>) page.getByXPath("//span[@class='" + SECTION_INFO_TAG_NAME + "']");
         return items.get(8).asText().trim();
     }
 
-    public static String getRegion(HtmlPage page) {
+    public String getRegion(HtmlPage page) {
         List<HtmlElement> items = (List<HtmlElement>) page.getByXPath("//span[@class='" + SECTION_INFO_TAG_NAME + "']");
         return items.get(10).asText().trim();
     }
 
-    //в абстрактный класс
-    private static int getIndex(List<HtmlElement> items, String point) {
-        int index = 0;
-        for (HtmlElement item : items) {
-            if (item.asText().contains(point)) {
-                break;
-            }
-            index++;
-        }
-        return index;
-    }
-
-    //вынести в асбстрактный класс
-    public static HtmlPage getHtmlPage(String link) throws IOException {
-        WebClient client = new WebClient();
-        client.getOptions().setCssEnabled(false);
-        client.getOptions().setJavaScriptEnabled(false);
-        return client.getPage(link);
-    }
 }
