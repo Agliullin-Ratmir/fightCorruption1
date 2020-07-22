@@ -66,7 +66,6 @@ public class MailService {
 
         MimeBodyPart attachmentBodyPart = new MimeBodyPart();
         attachmentBodyPart.attachFile(new File(PATH_TO_FILE));
-        //attachmentBodyPart.attachFile(new File("C:\\Users\\agliy\\IdeaProjects\\fightCorruption1\\target\\test1.xls"));
 
         multipart.addBodyPart(attachmentBodyPart);
         message.setContent(multipart);
