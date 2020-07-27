@@ -90,11 +90,18 @@ public class UtilClass {
      * @return
      */
     public static String getFirstKeyFromMap (Map map) {
+        if (map == null || map.size() == 0) {
+            return StringUtils.EMPTY;
+        }
         if (map.keySet().isEmpty()) {
             return StringUtils.EMPTY;
         }
         if (map.keySet().iterator().hasNext()) {
-            return map.keySet().iterator().next().toString();
+            Object key = map.keySet().iterator().next();
+            if (key == null) {
+                return StringUtils.EMPTY;
+            }
+            return key.toString();
         }
         return StringUtils.EMPTY;
     }
@@ -105,11 +112,18 @@ public class UtilClass {
      * @return
      */
     public static Double getFirstValueFromMap (Map map) {
+        if (map == null || map.size() == 0) {
+            return 0.0;
+        }
         if (map.keySet().isEmpty()) {
             return 0.0;
         }
         if (map.values().iterator().hasNext()) {
-            return Double.valueOf(map.values().iterator().next().toString());
+            Object value = map.values().iterator().next();
+            if (value == null) {
+                return 0.0;
+            }
+            return Double.valueOf(value.toString());
         }
         return 0.0;
     }

@@ -148,11 +148,7 @@ public class SearcherParser extends AbstractParser {
            fileEntities.add(new FileEntity(ticket, getFirstValueFromMap(maxPrice),
                    getFirstKeyFromMap(maxPrice), getFirstValueFromMap(minPrice),
                    getFirstKeyFromMap(minPrice), avgPrice));
-           if (i > 10) {
-               break;
-           } else {
-               i++;
-           }
+           i++;
            log.info(String.format("The current step is: %s",
                    i));
        }

@@ -56,7 +56,7 @@ public class ProcurementParser extends AbstractParser {
         List<Ticket> result = new ArrayList<>();
         int floor = configManager.getLimitFloor();
         try {
-            for (int pageNumber = 1; pageNumber <= 1; pageNumber++) {
+            for (int pageNumber = 1; pageNumber <= 3; pageNumber++) {
                 HtmlPage page = getHtmlPage(MAIN_PAGE_LINK + START_PAGE_LINK_FIRST + pageNumber + START_PAGE_LINK_SECOND);
                 Thread.sleep(1000);
                 int i = 0;
